@@ -1,0 +1,5 @@
+Requirements:
+
+python (<3.0)
+pygame
+pyopengl
