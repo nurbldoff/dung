@@ -190,12 +190,12 @@ class Map(object):
 
     def __init__(self):
 
-        map_surface1 = pygame.image.load("maps/map2.png")
+        self.map_surface1 = pygame.image.load("maps/map2.png")
         map_surface2 = pygame.image.load("maps/map3.png")
-        map_surface1.lock()
+        self.map_surface1.lock()
         map_surface2.lock()
 
-        w, h = map_surface1.get_size()
+        w, h = self.map_surface1.get_size()
 
         self.cubes = []
         wall_tex = LoadTextures()
@@ -230,14 +230,14 @@ class Map(object):
         for y in range(h):
             for x in range(w):
 
-                r, g, b, a = map_surface1.get_at((x, y))
+                r, g, b, a = self.map_surface1.get_at((x, y))
 
 
                 if (r, g, b) != (255, 255, 255):
                     neighbors = []
                     for i, coord in enumerate( ((x, y+1), (x, y-1), (x+1, y), (x-1, y)) ):
                         try:
-                            n = map_surface1.get_at(coord)
+                            n = self.map_surface1.get_at(coord)
                             if n == (255,255,255,255):
                                 neighbors.append(i)
                         except IndexError:
@@ -252,10 +252,14 @@ class Map(object):
                     self.cubes.append(cube)
 
 
-        map_surface1.unlock()
+        self.map_surface1.unlock()
         map_surface2.unlock()
 
         self.display_list = None
+
+    def is_wall(self, pos):
+        r, g, b, a = self.map_surface1.get_at((int(pos[0]), int(pos[2])))
+        return (r,g,b) != (255,255,255)
 
     def render(self, program):
 
@@ -284,29 +288,46 @@ class Player(object):
                      ((0, 0, 1), (1, 0, 1), (1, 0, 0), (1, 0,-1),
                       (0, 0 ,-1), (-1, 0,-1), (-1, 0, 0), (-1, 0, 1)))
 
-    def __init__(self, start_position, start_direction):
+    def __init__(self, level, start_position, start_direction):
+        self.map = level
         self.position = start_position    # a 3-vector with integers
         self.direction = start_direction  # an integer 0..7, 0 is along global z-axis
 
     def move_forward(self, steps=1):
         movement = -self.direction_map[self.direction]*steps
-        self.position += movement
-        return movement
+        new_position = self.position+movement
+        if not self.map.is_wall(new_position.as_tuple()):
+            self.position = new_position
+            return movement
+        else:
+            return Vector3(0,0,0)
 
     def move_backward(self, steps=1):
         movement = self.direction_map[self.direction]*steps
-        self.position += movement
-        return movement
+        new_position = self.position+movement
+        if not self.map.is_wall(new_position.as_tuple()):
+            self.position = new_position
+            return movement
+        else:
+            return Vector3(0,0,0)
 
     def move_right(self, steps=1):
         movement = self.direction_map[(self.direction+2)%8]*steps
-        self.position += movement
-        return movement
+        new_position = self.position+movement
+        if not self.map.is_wall(new_position.as_tuple()):
+            self.position = new_position
+            return movement
+        else:
+            return Vector3(0,0,0)
 
     def move_left(self, steps=1):
         movement = self.direction_map[(self.direction-2)%8]*steps
-        self.position += movement
-        return movement
+        new_position = self.position+movement
+        if not self.map.is_wall(new_position.as_tuple()):
+            self.position = new_position
+            return movement
+        else:
+            return Vector3(0,0,0)
 
     def turn_right(self, steps=1):
         self.direction = (self.direction-steps)%8
@@ -523,8 +544,8 @@ def run():
     glEnable(GL_CULL_FACE)
 
     # This object renders the 'map'
-    map = Map()
-    player = Player(start_position = Vector3(10, 0, 10),
+    level = Map()
+    player = Player(level, start_position = Vector3(10, 0, 10),
                     start_direction = 0)
 
     # Camera transform matrix
@@ -553,8 +574,8 @@ def run():
                 return
             elif event.type == pygame.KEYDOWN:
 
-                # Reset rotation and movement directions
-                player_position_delta.set(0.,0.,0.)
+                # Reset rotation and movement direction deltas
+                player_position_delta.set(0.0, 0.0, 0.0)
                 player_direction_delta = 0
 
                 rotation_direction.set(0.0, 1.0, 0.0)
@@ -583,115 +604,116 @@ def run():
                 print player.position
 
                 time_steps = 10
-                for i in range(10):
-                    print i,
-                    #init()
-                    # Clear the screen, and z-buffer
+                if True:
+                    for i in range(10):
+                        print i,
+                        #init()
+                        # Clear the screen, and z-buffer
 
-                    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-                    glClearColor(0.0, 0.0, 0.0, 0.0)
-
-
-                    #glEnable(GL_BLEND);
-                    ###glBlendFunc (GL_SRC_ALPHA, GL_ONE);
-
-                    #glClearColor(0.0, 0.0, 0.0, 0.0)
-
-                    # Obtain an frabebuffer object into which to render the dungeon
-                    fbo, rendertarget, depthbuffer = prepare_fbo()
-
-                    glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
-                    glColor4f(1,1,1,1)
-                    #texture=glGenTextures( 1 )
+                        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+                        glClearColor(0.0, 0.0, 0.0, 0.0)
 
 
-                    # Calculate rotation matrix and multiply by camera matrix
-                    rotation = rotation_direction * player_direction_delta/time_steps
-                    rotation_matrix = Matrix44.xyz_rotation(*rotation)
-                    camera_matrix *= rotation_matrix
+                        #glEnable(GL_BLEND);
+                        ###glBlendFunc (GL_SRC_ALPHA, GL_ONE);
 
-                    # # Calcluate movment and add it to camera matrix translate
-                    # heading = Vector3(camera_matrix.forward)
-                    # right = Vector3(camera_matrix.right)
-                    # movement = heading *movement_direction.z + right *movement_direction.x
-                    camera_matrix.translate += player_position_delta/time_steps
+                        #glClearColor(0.0, 0.0, 0.0, 0.0)
 
-                    # Upload the inverse camera matrix to OpenGL
-                    glLoadMatrixd(camera_matrix.get_inverse().to_opengl())
+                        # Obtain an frabebuffer object into which to render the dungeon
+                        fbo, rendertarget, depthbuffer = prepare_fbo()
+
+                        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
+                        glColor4f(1,1,1,1)
+                        #texture=glGenTextures( 1 )
 
 
-                    # # Light must be transformed as well
-                    # offset = (player.position+player_position_delta/time_steps*i)
-                    # glLight(GL_LIGHT0, GL_POSITION, (camera_matrix[3,0]-0,
-                    #                                  camera_matrix[3,1]-0,
-                    #                                  camera_matrix[3,2]-0,
-                    #                                  1.))
+                        # Calculate rotation matrix and multiply by camera matrix
+                        rotation = rotation_direction * player_direction_delta/time_steps
+                        rotation_matrix = Matrix44.xyz_rotation(*rotation)
+                        camera_matrix *= rotation_matrix
 
-                    glUseProgram(cave_shader)
+                        # # Calcluate movment and add it to camera matrix translate
+                        # heading = Vector3(camera_matrix.forward)
+                        # right = Vector3(camera_matrix.right)
+                        # movement = heading *movement_direction.z + right *movement_direction.x
+                        camera_matrix.translate += player_position_delta/time_steps
 
-                    #glEnable( GL_TEXTURE_2D );
-                    map.render(cave_shader)
-                    #glFlush()
-
-                    # stop rendering to FBO
-                    glPopAttrib()
-                    glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0)
-
-                    #glDisable( GL_BLEND );
-                    glEnable( GL_TEXTURE_2D );
+                        # Upload the inverse camera matrix to OpenGL
+                        glLoadMatrixd(camera_matrix.get_inverse().to_opengl())
 
 
-                    glClearColor(.1, 0.0, 0.0, 1.0)	# This Will Clear The Background Color To Black
-                    glClearDepth(1.0)					# Enables Clearing Of The Depth Buffer
+                        # # Light must be transformed as well
+                        # offset = (player.position+player_position_delta/time_steps*i)
+                        # glLight(GL_LIGHT0, GL_POSITION, (camera_matrix[3,0]-0,
+                        #                                  camera_matrix[3,1]-0,
+                        #                                  camera_matrix[3,2]-0,
+                        #                                  1.))
 
-                    glMatrixMode(GL_PROJECTION)
-                    glLoadIdentity()
-                    #gluPerspective(45.0, 8./6, 0.1, 100.0)
+                        glUseProgram(cave_shader)
 
-                    gluPerspective(45.0, 8.0/4.8, 0.1, 10.0)
+                        #glEnable( GL_TEXTURE_2D );
+                        level.render(cave_shader)
+                        #glFlush()
 
-                    glMatrixMode(GL_MODELVIEW)
-                    glLoadIdentity()
+                        # stop rendering to FBO
+                        glPopAttrib()
+                        glBindFramebufferEXT(GL_FRAMEBUFFER_EXT, 0)
 
-                    glBindTexture( GL_TEXTURE_2D, rendertarget )
+                        #glDisable( GL_BLEND );
+                        glEnable( GL_TEXTURE_2D );
 
-                    glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
-                                     GL_CLAMP);
-                    glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
-                                     GL_CLAMP);
-                    gluLookAt(0, 0, 2.4,
-                              0, 0, 1,
-                              0, 1, 0)
 
-                    # Draw a single quad to serve as view
-                    glColor3f(0.9, 0.9, 1.0)            # Bluish shade
-                    glUseProgram(shader)
-                    glBegin(GL_QUADS)
-                    glTexCoord2f(.85,.85);
-                    glVertex3f(1.0, 1.0, 0.0)           # Top Right
-                    glTexCoord2f(0.15,.85);
-                    glVertex3f(-1.0, 1.0, 0.0)          # Top Left
-                    glTexCoord2f(0.15,0.15);
-                    glVertex3f(-1.0, -1.0, 0.0)         # Bottom Left
-                    glTexCoord2f(0.85, 0.15);
-                    glVertex3f(1.0, -1.0, 0.0)          # Bottom Right
+                        glClearColor(.1, 0.0, 0.0, 1.0)	# This Will Clear The Background Color To Black
+                        glClearDepth(1.0)					# Enables Clearing Of The Depth Buffer
 
-                    glEnd()
+                        glMatrixMode(GL_PROJECTION)
+                        glLoadIdentity()
+                        #gluPerspective(45.0, 8./6, 0.1, 100.0)
 
-                    glFlush()
-                    glUseProgram(0)
+                        gluPerspective(45.0, 8.0/4.8, 0.1, 10.0)
 
-                    # Show the screen
-                    pygame.display.flip()
+                        glMatrixMode(GL_MODELVIEW)
+                        glLoadIdentity()
 
-                    # glDisable( GL_BLEND );
-                    # glEnable( GL_TEXTURE_2D );
-                    # glEnable( GL_DEPTH_TEST );
-                    # glDeleteTextures(texture)
+                        glBindTexture( GL_TEXTURE_2D, rendertarget )
 
-                    # Free some memory
-                    glDeleteFramebuffers(1, depthbuffer)
-                    glDeleteTextures(rendertarget)
-                    glDeleteFramebuffers(1,fbo)
+                        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
+                                         GL_CLAMP);
+                        glTexParameterf( GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
+                                         GL_CLAMP);
+                        gluLookAt(0, 0, 2.4,
+                                  0, 0, 1,
+                                  0, 1, 0)
+
+                        # Draw a single quad to serve as view
+                        glColor3f(0.9, 0.9, 1.0)            # Bluish shade
+                        glUseProgram(shader)
+                        glBegin(GL_QUADS)
+                        glTexCoord2f(.85,.85);
+                        glVertex3f(1.0, 1.0, 0.0)           # Top Right
+                        glTexCoord2f(0.15,.85);
+                        glVertex3f(-1.0, 1.0, 0.0)          # Top Left
+                        glTexCoord2f(0.15,0.15);
+                        glVertex3f(-1.0, -1.0, 0.0)         # Bottom Left
+                        glTexCoord2f(0.85, 0.15);
+                        glVertex3f(1.0, -1.0, 0.0)          # Bottom Right
+
+                        glEnd()
+
+                        glFlush()
+                        glUseProgram(0)
+
+                        # Show the screen
+                        pygame.display.flip()
+
+                        # glDisable( GL_BLEND );
+                        # glEnable( GL_TEXTURE_2D );
+                        # glEnable( GL_DEPTH_TEST );
+                        # glDeleteTextures(texture)
+
+                        # Free some memory
+                        glDeleteFramebuffers(1, depthbuffer)
+                        glDeleteTextures(rendertarget)
+                        glDeleteFramebuffers(1,fbo)
 
 run()
